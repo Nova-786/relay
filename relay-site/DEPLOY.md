@@ -15,7 +15,7 @@ Open `index.html`, find `CONFIG` near the top of the last script and set `legalN
 Check the Terms, Privacy and Refund pages and have a lawyer review them.
 
 ## 3. Deploy
-1. Create a GitHub repo and upload everything in this folder (keep the `api`, `lib` and `test` folders).
+1. Create a GitHub repo and upload everything in this folder (keep the `api`, `server`, `lib` and `test` folders).
 2. In Vercel choose Add New > Project, import the repo, and deploy.
 3. In the project, open Storage > Marketplace and add Upstash Redis. It adds the database settings for you.
 4. In Settings > Environment Variables add the settings below, then redeploy.
@@ -64,3 +64,6 @@ The Upstash settings (KV_REST_API_URL, KV_REST_API_TOKEN) are added by the Marke
 - No WhatsApp or email channel and no live order lookups yet.
 - Search matches keywords and synonyms, not true meaning (no embeddings).
 - Website import reads up to 7 pages per run and only plain HTML (not pages that need JavaScript to show their text).
+
+## Why there is only one file in `api/`
+Vercel's free (Hobby) plan allows at most 12 serverless functions per project. Relay has 18 endpoints, so they live in `server/routes/` and a single function, `api/[...path].js`, serves all of them. Addresses such as `/api/chat` and `/api/plans` work exactly as before. To add an endpoint, create `server/routes/name.js` and list it in `api/[...path].js`.

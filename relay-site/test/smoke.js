@@ -54,7 +54,7 @@ global.fetch = async (url, o = {}) => {
 const call = async (file, { method = "POST", body = {}, query = {}, code } = {}) => {
   let out = { status: 200, body: null };
   const res = { setHeader() {}, status(s) { out.status = s; return this; }, json(b) { out.body = b; return this; }, send(b) { out.body = b; return this; }, end() { return this; } };
-  await require("../api/" + file)({ method, body, query, headers: { host: "relay.test", "x-relay-code": code || "" } }, res);
+  await require("../server/routes/" + file)({ method, body, query, headers: { host: "relay.test", "x-relay-code": code || "" } }, res);
   return out;
 };
 const pow = require("../lib/pow");
@@ -85,7 +85,7 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? "PASS " : "FAIL ") + ms
   r = await call("cron.js", { method: "GET" }); ok(r.status === 401, "cron rejects missing secret");
   const bk = "code:" + code, auth = { headers: {} };
   const edit = f => { const rec = JSON.parse(db.get(bk)); f(rec); db.set(bk, JSON.stringify(rec)); };
-  const cron = async () => { const res = { status() { return this; }, json() { return this; }, end() {} }; await require("../api/cron.js")({ headers: { authorization: "Bearer cron" } }, res); };
+  const cron = async () => { const res = { status() { return this; }, json() { return this; }, end() {} }; await require("../server/routes/cron.js")({ headers: { authorization: "Bearer cron" } }, res); };
   edit(x => { x.trialEnd = x.nextBill = Date.now() + 2 * 864e5; }); await cron(); ok(emails.some(e => /ends soon/i.test(e)) && calls.charge === 0, "reminder sent 3 days before, no charge yet");
   edit(x => { x.trialEnd = x.nextBill = Date.now() - 1000; }); await cron(); let rec = JSON.parse(db.get(bk));
   ok(calls.charge === 1 && rec.status === "active" && rec.nextBill > Date.now() + 25 * 864e5, "charged after trial and renewed a month ahead"); ok(emails.some(e => /Payment received/i.test(e)), "receipt email sent");
@@ -129,5 +129,9 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? "PASS " : "FAIL ") + ms
   r = await call("admin.js", { method: "GET", query: { key: "nope" } }); ok(r.status === 401, "admin refuses a wrong key");
   r = await call("admin.js", { method: "GET", query: { key: "cron" } }); ok(r.body.summary.accounts >= 1 && typeof r.body.summary.mrr === "number" && r.body.rows.some(x => x.email === "three@shop.com"), "admin shows accounts and revenue");
   await call("admin.js", { query: { key: "cron" }, body: { action: "disable", code: c3 } }); r = await call("chat.js", { code: c3, body: { messages: [{ role: "user", content: "hi" }] } }); ok(r.status === 403, "admin can switch an account off");
+  { const router = require("../api/[...path].js"); let o = { status: 200, body: null }; const rs = { setHeader() {}, status(s) { o.status = s; return this; }, json(b) { o.body = b; return this; }, end() { return this; } };
+    await router({ method: "GET", url: "/api/plans?x=1", query: {}, headers: {} }, rs); ok(o.body && o.body.plans && o.body.plans.length === 3, "the single API function routes /api/plans");
+    await router({ method: "GET", url: "/api/nope", query: {}, headers: {} }, rs); ok(o.status === 404, "unknown API addresses return 404");
+    await router({ method: "GET", url: "/api/constructor", query: {}, headers: {} }, rs); ok(o.status === 404, "router ignores inherited object names"); }
   console.log(fails ? "\n" + fails + " FAILED" : "\nAll checks passed"); process.exit(fails ? 1 : 0);
 })().catch(e => { console.error("CRASH", e); process.exit(1); });
